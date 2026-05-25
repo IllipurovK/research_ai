@@ -58,22 +58,28 @@
   - Извлекает первый абзац (без разметки), обрезает до 2000 символов.
   - Возвращает ссылку на страницу Википедии.
 
-- Тестирование: настроен pytest, написаны тесты для:
-  - test_config.py
-  - test_logger.py
-  - test_memory.py
-  - test_models.py
-  - test_wiki_tool.py
+✅ **Этап 2.2 завершён** — инструмент DuckDuckGo реализован и протестирован.
 
+- **DuckDuckGo-инструмент** (`tools/duckduckgo_tool.py`):
+  - Асинхронная функция `search_duckduckgo(query)`.
+  - Использует `asyncio.to_thread` для синхронного `DDGS().atext()`.
+  - Повторы через `tenacity.retry` (3 попытки с экспоненциальной задержкой 2, 4, 8 секунд).
+  - Таймаут 15 секунд через `asyncio.wait_for`.
+  - Возвращает объединённый текст (обрезанный до 2000 символов) и уникальные URL.
+  - Успех, если длина текста не менее 50 символов и найден хотя бы один URL.
+
+- **Тестирование**: настроен `pytest`, написаны тесты для:
+  - `test_config.py`
+  - `test_logger.py`
+  - `test_memory.py`
+  - `test_models.py`
+  - `test_wiki_tool.py`
+  - `test_duckduckgo_tool.py`
 
 Запуск всех тестов:
 ```bash
 pytest tests/ -v
 ```
-
-
-## Демонстрация
-Скриншоты и демонстрационный отчёт будут добавлены после реализации полного цикла (этапы 1–7). На данный момент доступны примеры запуска и шаблон ожидаемого отчёта (см. раздел «Примеры»).
 
 ## Установка
 ```bash
@@ -163,7 +169,15 @@ Google сообщил о создании 70-кубитного процессо
 - Инструменты:
   - Wikipedia — wikipedia>=1.4.0.
   - DuckDuckGo — duckduckgo-search>=4.0.0.
-- Библиотеки: openai>=1.0.0, pydantic>=2.0.0, python-dotenv>=1.0.0, loguru>=0.7.0, aiohttp>=3.9.0, tenacity>=8.2.0, pytest>=8.0.0, pytest-asyncio>=0.23.0.
+- Библиотеки: 
+  - openai>=1.0.0,
+  - pydantic>=2.0.0,
+  - python-dotenv>=1.0.0,
+  - loguru>=0.7.0,
+  - aiohttp>=3.9.0,
+  - tenacity>=8.2.0,
+  - pytest>=8.0.0,
+  - pytest-asyncio>=0.23.0.
 
 ## Структура проекта
 
@@ -184,8 +198,14 @@ researcher_AI/
 │   │   ├── replanner.txt
 │   │   ├── synthesizer.txt
 │   └── reports/            # сгенерированные отчёты (пусто)
-│   └── tests/
+│   └── tests/              # промежуточные тесты 
 │   │   ├── test_agent.py
+│   │   ├── test_configюpy
+│   │   ├── test_duckduckgo_tool.py
+│   │   ├── test_wiki_tool.py
+│   │   ├── test_logger.py
+│   │   ├── test_memory.py
+│   │   ├── test_models.py
 │   └── tools/
 │       ├── duckduckgo_tool.py (в разработке)
 │       ├── wiki_tool.py    # Wikipedia API (асинхронный)
@@ -197,7 +217,7 @@ researcher_AI/
 - Этап 0: Базовая инфраструктура — ✅ выполнено.
 - Этап 1: Модели данных (Pydantic схемы) — ✅ выполнено.
 - Этап 2.1: Инструмент Wikipedia — ✅ выполнено
-- Этап 2.2: Инструмент DuckDuckGo (асинхронный поиск)
+- Этап 2.2: Инструмент DuckDuckGo (асинхронный поиск) — ✅ выполнено
 - Этап 3: Клиент LLM (DeepSeek, позже Gemini) — планируется.
 - Этап 4: Executor (выбор инструмента + вызов) — планируется.
 - Этап 5: Planner и промпты (генерация плана) — планируется.
