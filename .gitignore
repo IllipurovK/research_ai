@@ -33,3 +33,14 @@ reports/
 logs/
 *.log
 temp/
+
+
+# Python packaging
+*.egg-info/
+*.egg
+dist/
+build/
+dependency_links.txt
+PKG-INFO
+SOURCES.txt
+top_level.txt
