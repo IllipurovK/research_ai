@@ -86,6 +86,15 @@
 
 Теперь агент может обращаться к DeepSeek API с контролем времени и повторными попытками.
 
+✅ **Этап 4 завершён** — rule-based Executor реализован и протестирован.
+
+- **Executor** (`executor.py`):
+  - Функция `select_tool_by_keywords(description, expected_keywords)` возвращает `"wiki"` или `"web"`.
+  - Логика:
+    - Если передан `expected_keywords`, проверяется пересечение с `config.WIKI_KEYWORDS` (множество: "определение", "что такое", "история", "термин", "факты", "список", "описание").
+    - Иначе анализируется описание шага: если любое слово из `description` присутствует в `WIKI_KEYWORDS` → `"wiki"`, иначе `"web"`.
+  - Простое, быстрое, без LLM — подходит для демонстрации Plan-and-Execute.
+
 - **Тестирование**: настроен `pytest`, написаны тесты для:
   - `test_config.py`
   - `test_logger.py`
@@ -93,6 +102,7 @@
   - `test_models.py`
   - `test_wiki_tool.py`
   - `test_duckduckgo_tool.py`
+  - `test_executor.py`
 
 Запуск всех тестов:
 ```bash
@@ -202,7 +212,7 @@ Google сообщил о создании 70-кубитного процессо
 ```text
 researcher_AI/
 ├── config.py               # загрузка .env, константы
-├── executor.py             # выбор инструмента по ключевым словам  (в разработке)
+├── executor.py             # rule-based выбор инструмента (wiki/web)
 ├── llm_client.py           # клиент DeepSeek (AsyncOpenAI, retry, remaining_time)
 ├── logger.py               # настройка loguru (файл+консоль)
 ├── main.py                 # точка входа, CLI (в разработке)
@@ -238,7 +248,7 @@ researcher_AI/
 - Этап 2.1: Инструмент Wikipedia — ✅ выполнено
 - Этап 2.2: Инструмент DuckDuckGo (асинхронный поиск) — ✅ выполнено
 - Этап 3: Клиент LLM (DeepSeek) — ✅ выполнено
-- Этап 4: Executor (выбор инструмента + вызов) — планируется.
+- Этап 4: Executor (rule-based) — ✅ выполнено
 - Этап 5: Planner и промпты (генерация плана) — планируется.
 - Этап 6: Оркестратор (цикл Plan → Execute → Replan) — планируется.
 - Этап 7: Synthesizer (финальный отчёт) — планируется.
