@@ -95,6 +95,28 @@
     - Иначе анализируется описание шага: если любое слово из `description` присутствует в `WIKI_KEYWORDS` → `"wiki"`, иначе `"web"`.
   - Простое, быстрое, без LLM — подходит для демонстрации Plan-and-Execute.
 
+✅ **Этап 5 завершён** — Planner и промпты реализованы и протестированы.
+
+- **Промпты** (`prompts/`):
+  - `planner.txt` — системный промпт для генерации плана исследования.
+  - `replanner.txt` — промпт для перепланирования при ошибках.
+  - `synthesizer.txt` — промпт для финального синтеза отчёта (будет использован на Этапе 7).
+
+- **Planner** (`planner.py`):
+  - `load_prompt(filename)` — утилита для чтения промптов из файлов.
+  - `generate_plan(topic, mode, remaining_time)` — асинхронная генерация плана:
+    - Читает системный промпт из `planner.txt`.
+    - Учитывает режим (`fast` или `deep`): `min_steps`, `max_steps`, таймаут.
+    - Вызывает `call_llm` с user_prompt: `"Тема: {topic}. Составь план из {min_steps}-{max_steps} шагов."`
+    - Парсит JSON, при ошибке повторяет вызов один раз.
+    - Обрезает результат до `max_steps`.
+    - Возвращает список словарей с полями `description` и `expected_keywords`.
+  - `replan(remaining_steps, last_step, all_steps, mode, remaining_time)` — перепланирование:
+    - Формирует контекст (оставшиеся шаги, последний шаг, все выполненные шаги).
+    - Вызывает LLM с промптом из `replanner.txt`.
+    - При ошибке парсинга возвращает исходный `remaining_steps`.
+    - Возвращает обновлённый список шагов.
+
 - **Тестирование**: настроен `pytest`, написаны тесты для:
   - `test_config.py`
   - `test_logger.py`
@@ -103,6 +125,8 @@
   - `test_wiki_tool.py`
   - `test_duckduckgo_tool.py`
   - `test_executor.py`
+  - `test_planner.py`
+
 
 Запуск всех тестов:
 ```bash
@@ -219,7 +243,7 @@ researcher_AI/
 ├── memory.py               # класс Memory: список шагов, дедупликация
 ├── models.py               # Pydantic модели (Plan, Step, Memory, Report)
 ├── orchestrator.py         # координация (в разработке)
-├── planner.py              # Planner (начальный план) + Replanner
+├── planner.py              # generate_plan, replan (с промптами)
 ├── research_agent/
 │   ├── promts/             # Промты для агентов
 │   │   ├── planner.txt
@@ -249,7 +273,7 @@ researcher_AI/
 - Этап 2.2: Инструмент DuckDuckGo (асинхронный поиск) — ✅ выполнено
 - Этап 3: Клиент LLM (DeepSeek) — ✅ выполнено
 - Этап 4: Executor (rule-based) — ✅ выполнено
-- Этап 5: Planner и промпты (генерация плана) — планируется.
+- Этап 5: Planner и промпты — ✅ выполнено
 - Этап 6: Оркестратор (цикл Plan → Execute → Replan) — планируется.
 - Этап 7: Synthesizer (финальный отчёт) — планируется.
 - Этап 8: CLI (аргументы, вывод) — планируется.

@@ -16,4 +16,4 @@ def test_select_tool_by_keywords():
     assert select_tool_by_keywords("Здесь есть ФАКТЫ", None) == "wiki"
     assert select_tool_by_keywords("терминология", None) == "web"
 
-# pytest research_agent/tests/test_executor.py -v      
+# pytest research_agent/tests/test_executor.py -v
