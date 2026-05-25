@@ -4,16 +4,17 @@
 
 ## Оглавление
 - [Возможности](#возможности)
+- [Стек технологий](#стек-технологий)
+- [Структура проекта](#структура-проекта)
 - [Текущий статус](#текущий-статус)
-- [Демонстрация](#демонстрация)
 - [Установка](#установка)
 - [Использование](#использование)
 - [Примеры](#примеры)
-- [Стек технологий](#стек-технологий)
-- [Структура проекта](#структура-проекта)
 - [Планы развития](#планы-развития)
 - [Контакты](#контакты)
 
+
+  
 ## Возможности
 - **Планирование исследования** — Gemini разбивает запрос на 3–7 шагов, формируя ясную последовательность задач для исполнения.
 - **Исполнение шагов** — DeepSeek выбирает нужный инструмент (Wikipedia или DuckDuckGo) и выполняет поиск по каждому шагу.
@@ -23,6 +24,59 @@
 - **Обработка ошибок** — до 2 попыток с переформулировкой запроса исполнителем (DeepSeek), затем перепланирование задач планировщиком (Gemini).
 - **Синтез отчёта** — Gemini собирает результаты в структурированный Markdown-документ с заголовками, списками и ссылками на источники.
 - **Минимальная стоимость** — использует бесплатные или дешёвые API (например, Gemini бесплатно до 3000 запросов/день; DeepSeek — бюджетный) для снижения затрат на масштабирование.
+
+## Стек технологий
+- Язык: Python 3.10+.
+- LLM:
+  - Gemini — планировщик (Planner / Replanner / Synthesizer) через Google Generative AI API.
+  - DeepSeek — исполнитель (OpenAI-совместимый клиент) для поиска и загрузки данных.
+- Инструменты:
+  - Wikipedia — wikipedia>=1.4.0.
+  - DuckDuckGo — duckduckgo-search>=4.0.0.
+- Библиотеки: 
+  - openai>=1.0.0,
+  - pydantic>=2.0.0,
+  - python-dotenv>=1.0.0,
+  - loguru>=0.7.0,
+  - aiohttp>=3.9.0,
+  - tenacity>=8.2.0,
+  - pytest>=8.0.0,
+  - pytest-asyncio>=0.23.0.
+
+## Структура проекта
+
+```text
+researcher_AI/
+├── config.py               # загрузка .env, константы
+├── executor.py             # rule-based выбор инструмента (wiki/web)
+├── llm_client.py           # клиент DeepSeek (AsyncOpenAI, retry, remaining_time)
+├── logger.py               # настройка loguru (файл+консоль)
+├── main.py                 # точка входа, CLI (в разработке)
+├── memory.py               # класс Memory: список шагов, дедупликация
+├── models.py               # Pydantic модели (Plan, Step, Memory, Report)
+├── orchestrator.py         # полный цикл Plan-and-Execute
+├── synthesizer.py          # заглушка (будет заменена на Этапе 7)
+├── planner.py              # generate_plan, replan (с промптами)
+├── research_agent/
+│   ├── promts/             # Промты для агентов
+│   │   ├── planner.txt
+│   │   ├── replanner.txt
+│   │   ├── synthesizer.txt
+│   └── reports/            # сгенерированные отчёты (пусто)
+│   └── tests/              # промежуточные тесты 
+│   │   ├── test_executor.py
+│   │   ├── test_llm_client.py
+│   │   ├── test_logger.py
+│   │   ├── test_memory.py
+│   │   ├── test_models.py
+│   │   ├── test_orchestrator.py
+│   │   ├── test_planner.py
+│   │   ├── test_wiki_tool.py
+│   │   ├── test_duckduckgo_tool.py
+│   └── tools/
+│       ├── duckduckgo_tool.py  # duckduckgo API
+│       ├── wiki_tool.py        # Wikipedia API (асинхронный)
+```
 
 ## Текущий статус
 
@@ -117,6 +171,33 @@
     - При ошибке парсинга возвращает исходный `remaining_steps`.
     - Возвращает обновлённый список шагов.
 
+✅ **Этап 6 завершён** — Оркестратор реализован и протестирован.
+
+- **Оркестратор** (`orchestrator.py`):
+  - Асинхронная функция `research_agent(topic, mode)` → `(Memory, report)`.
+  - Реализует полный цикл Plan-and-Execute:
+    1. **Инициализация**: `Memory`, замер времени, получение `timeout_limit` из конфига.
+    2. **Планирование**: вызов `generate_plan` с учётом оставшегося времени.
+    3. **Цикл выполнения**:
+       - Проверка оставшегося времени перед каждым шагом.
+       - Дедупликация: если запрос уже выполнялся, создаётся `Step` с `success=False` (без вызова инструмента).
+       - Выбор инструмента через `select_tool_by_keywords`.
+       - Вызов инструмента (`wiki_tool` или `duckduckgo_tool`) с обработкой ошибок и таймаутами.
+       - Добавление шага в `Memory`.
+       - Логирование прогресса в консоль: `[1/3] Что такое квантовый компьютер? -> wiki успех`.
+       - После каждого успешного шага — перепланирование: вызов `replan` с оставшимися шагами и контекстом.
+       - Ограничение общего числа шагов (`MAX_GLOBAL_STEPS = 15`).
+    4. **Синтез отчёта**: вызов `synthesize_report` (пока заглушка, возвращает временный отчёт).
+  - Управление временем: `remaining_time` передаётся во все вызовы `call_llm`, при недостатке времени — остановка и частичный отчёт.
+
+- **Synthesizer (заглушка)** (`synthesizer.py`):
+  - Временная реализация `synthesize_report(memory, topic)`, возвращающая Markdown-заглушку с перечислением успешных шагов.
+  - Будет заменена на полноценную LLM-генерацию на Этапе 7.
+
+- **Тестирование** (`test_orchestrator.py`):
+  - Интеграционные тесты с моками всех внешних вызовов (`generate_plan`, `replan`, `search_wikipedia`, `search_duckduckgo`).
+  - Проверка дедупликации, ограничения шагов, обработки ошибок и логирования.
+
 - **Тестирование**: настроен `pytest`, написаны тесты для:
   - `test_config.py`
   - `test_logger.py`
@@ -126,7 +207,7 @@
   - `test_duckduckgo_tool.py`
   - `test_executor.py`
   - `test_planner.py`
-
+  - `test_orchestrator.py`
 
 Запуск всех тестов:
 ```bash
@@ -182,12 +263,25 @@ async def demo():
 
 asyncio.run(demo())
 ```
+
 Полноценный запуск агента
 После реализации полного цикла (Этапы 2–10) агент будет запускаться из командной строки:
 ```bash
 python main.py "квантовые компьютеры"
 ```
 Результат — отчёт в формате Markdown, сохранённый в файл или выведенный в консоль.
+
+пример запуска оркестратора
+```bash
+import asyncio
+from orchestrator import research_agent
+
+async def main():
+    memory, report = await research_agent("квантовые компьютеры", mode="fast")
+    print(report)
+
+asyncio.run(main())
+```
 
 ## Примеры
 
@@ -213,57 +307,6 @@ Google сообщил о создании 70-кубитного процессо
 
 (Полные демонстрации и реальные отчёты будут добавлены после реализации этапов исполнения и синтеза.)
 
-## Стек технологий
-- Язык: Python 3.10+.
-- LLM:
-  - Gemini — планировщик (Planner / Replanner / Synthesizer) через Google Generative AI API.
-  - DeepSeek — исполнитель (OpenAI-совместимый клиент) для поиска и загрузки данных.
-- Инструменты:
-  - Wikipedia — wikipedia>=1.4.0.
-  - DuckDuckGo — duckduckgo-search>=4.0.0.
-- Библиотеки: 
-  - openai>=1.0.0,
-  - pydantic>=2.0.0,
-  - python-dotenv>=1.0.0,
-  - loguru>=0.7.0,
-  - aiohttp>=3.9.0,
-  - tenacity>=8.2.0,
-  - pytest>=8.0.0,
-  - pytest-asyncio>=0.23.0.
-
-## Структура проекта
-
-```text
-researcher_AI/
-├── config.py               # загрузка .env, константы
-├── executor.py             # rule-based выбор инструмента (wiki/web)
-├── llm_client.py           # клиент DeepSeek (AsyncOpenAI, retry, remaining_time)
-├── logger.py               # настройка loguru (файл+консоль)
-├── main.py                 # точка входа, CLI (в разработке)
-├── memory.py               # класс Memory: список шагов, дедупликация
-├── models.py               # Pydantic модели (Plan, Step, Memory, Report)
-├── orchestrator.py         # координация (в разработке)
-├── planner.py              # generate_plan, replan (с промптами)
-├── research_agent/
-│   ├── promts/             # Промты для агентов
-│   │   ├── planner.txt
-│   │   ├── replanner.txt
-│   │   ├── synthesizer.txt
-│   └── reports/            # сгенерированные отчёты (пусто)
-│   └── tests/              # промежуточные тесты 
-│   │   ├── test_agent.py
-│   │   ├── test_configюpy
-│   │   ├── test_duckduckgo_tool.py
-│   │   ├── test_wiki_tool.py
-│   │   ├── test_logger.py
-│   │   ├── test_memory.py
-│   │   ├── test_models.py
-│   │   ├── test_llm_client.py
-│   └── tools/
-│       ├── duckduckgo_tool.py (в разработке)
-│       ├── wiki_tool.py    # Wikipedia API (асинхронный)
-```
-
 ## Планы развития
 Проект разбит на последовательные этапы:
 
@@ -274,10 +317,10 @@ researcher_AI/
 - Этап 3: Клиент LLM (DeepSeek) — ✅ выполнено
 - Этап 4: Executor (rule-based) — ✅ выполнено
 - Этап 5: Planner и промпты — ✅ выполнено
-- Этап 6: Оркестратор (цикл Plan → Execute → Replan) — планируется.
-- Этап 7: Synthesizer (финальный отчёт) — планируется.
+- Этап 6: Оркестратор — ✅ выполнено
+- Этап 7: Synthesizer (финальный отчёт через LLM) — планируется.
 - Этап 8: CLI (аргументы, вывод) — планируется.
-- Этап 9: Тесты (юнит-тесты) — планируется.
+- Этап 9: Тесты (юнит-тесты  для всех модулей) — в работе.
 - Этап 10: Документация (финальный README, демо) — в работе.
 
 Каждый этап содержит критерии приёмки и тесты; для надёжности используются повторные попытки запросов и централизованная обработка ошибок.
