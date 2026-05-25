@@ -49,12 +49,28 @@
   - `add_step()` — добавляет шаг в историю
   - `get_successful_steps()` — возвращает только успешные шаги (полезно для синтеза отчёта)
 
-Эти компоненты уже можно импортировать и использовать в тестах.
+✅ Этап 2.1 завершён — инструмент Wikipedia реализован и протестирован.
 
-Проверка логирования:
+- Wikipedia-инструмент (tools/wiki_tool.py):
+  - Асинхронная функция search_wikipedia(query).
+  - Использует aiohttp.ClientSession, таймаут 10 секунд.
+  - Обрабатывает 404 и другие ошибки, возвращает (text, urls, success, error).
+  - Извлекает первый абзац (без разметки), обрезает до 2000 символов.
+  - Возвращает ссылку на страницу Википедии.
+
+- Тестирование: настроен pytest, написаны тесты для:
+  - test_config.py
+  - test_logger.py
+  - test_memory.py
+  - test_models.py
+  - test_wiki_tool.py
+
+
+Запуск всех тестов:
 ```bash
-python -c "from logger import logger; logger.info('Test'); logger.debug('Debug')"
+pytest tests/ -v
 ```
+
 
 ## Демонстрация
 Скриншоты и демонстрационный отчёт будут добавлены после реализации полного цикла (этапы 1–7). На данный момент доступны примеры запуска и шаблон ожидаемого отчёта (см. раздел «Примеры»).
@@ -62,8 +78,8 @@ python -c "from logger import logger; logger.info('Test'); logger.debug('Debug')
 ## Установка
 ```bash
 # Клонирование репозитория
-git clone https://github.com/ваш_проект/research-ai-agent.git
-cd research-ai-agent
+git clone https://github.com/IllipurovK/research_ai.git
+cd research-ai
 
 # Установка зависимостей
 pip install -r requirements.txt
@@ -77,12 +93,43 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
 ```
 
 ## Использование
-После реализации полного цикла агент будет запускаться из командной строки:
+Текущие возможности (для разработчиков). Вы можете уже сейчас использовать реализованные компоненты:
+
+Пример кода:
+```bash
+from models import Step
+from memory import Memory
+import asyncio
+from tools.wiki_tool import search_wikipedia
+
+# Создаём шаг
+step = Step(
+    step_id=1,
+    description="Поиск фактов о квантовых компьютерах",
+    query="квантовый компьютер история",
+    normalized_query="квантовый компьютер история"
+)
+
+# Работа с памятью
+mem = Memory()
+mem.add_step(step)
+print(mem.is_duplicate("квантовый компьютер история"))  # True
+
+# Поиск в Wikipedia
+async def demo():
+    text, urls, success, error = await search_wikipedia("квантовый компьютер")
+    if success:
+        print(f"Найдено: {text[:100]}...")
+        print(f"Ссылка: {urls[0]}")
+
+asyncio.run(demo())
+```
+Полноценный запуск агента
+После реализации полного цикла (Этапы 2–10) агент будет запускаться из командной строки:
 ```bash
 python main.py "квантовые компьютеры"
 ```
-
-Результат — отчёт в формате Markdown, сохранённый в файл `research_agent/reports/<query>_<timestamp>.md` или выведенный в консоль в зависимости от CLI-опций.
+Результат — отчёт в формате Markdown, сохранённый в файл или выведенный в консоль.
 
 ## Примеры
 
@@ -123,25 +170,25 @@ Google сообщил о создании 70-кубитного процессо
 ```text
 researcher_AI/
 ├── config.py               # загрузка .env, константы
-├── executor.py             # выбор инструмента по ключевым словам
+├── executor.py             # выбор инструмента по ключевым словам  (в разработке)
 ├── llm_client.py
 ├── logger.py               # настройка loguru (файл+консоль)
-├── main.py                 # точка входа, CLI
+├── main.py                 # точка входа, CLI (в разработке)
 ├── memory.py               # класс Memory: список шагов, дедупликация
 ├── models.py               # Pydantic модели (Plan, Step, Memory, Report)
-├── orchestrator.py
+├── orchestrator.py         # координация (в разработке)
 ├── planner.py              # Planner (начальный план) + Replanner
 ├── research_agent/
-│   ├── promts/
+│   ├── promts/             # Промты для агентов
 │   │   ├── planner.txt
 │   │   ├── replanner.txt
 │   │   ├── synthesizer.txt
-│   └── reports/
+│   └── reports/            # сгенерированные отчёты (пусто)
 │   └── tests/
 │   │   ├── test_agent.py
 │   └── tools/
-│       ├── duckduckgo_tool.py
-│       ├── wiki_tool.py
+│       ├── duckduckgo_tool.py (в разработке)
+│       ├── wiki_tool.py    # Wikipedia API (асинхронный)
 ```
 
 ## Планы развития
@@ -149,7 +196,8 @@ researcher_AI/
 
 - Этап 0: Базовая инфраструктура — ✅ выполнено.
 - Этап 1: Модели данных (Pydantic схемы) — ✅ выполнено.
-- Этап 2: Инструменты (Wikipedia, DuckDuckGo) — планируется.
+- Этап 2.1: Инструмент Wikipedia — ✅ выполнено
+- Этап 2.2: Инструмент DuckDuckGo (асинхронный поиск)
 - Этап 3: Клиент LLM (DeepSeek, позже Gemini) — планируется.
 - Этап 4: Executor (выбор инструмента + вызов) — планируется.
 - Этап 5: Planner и промпты (генерация плана) — планируется.
@@ -162,7 +210,8 @@ researcher_AI/
 Каждый этап содержит критерии приёмки и тесты; для надёжности используются повторные попытки запросов и централизованная обработка ошибок.
 
 ## Контакты
-Автор: Ваше имя — добавьте GitHub / Telegram / почту по желанию.  
-Проект: ссылка на репозиторий будет добавлена.
-
+- Автор: Константин Иллипуров
+- GitHub: [IllipurovK](https://github.com/IllipurovK)
+- Telegram: [@lvxnmc](https://t.me/lvxnmc)
+- Task log: [Google Docs](https://clck.su/Rdovx)
 ---
