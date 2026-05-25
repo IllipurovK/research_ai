@@ -1,7 +1,7 @@
-Research AI Agent
+### Research AI Agent
 Автоматизированная система для сбора, синтеза и структурирования информации из открытых источников (Wikipedia, DuckDuckGo) по методологии Plan-and-Execute. Пользователь получает готовый отчёт в формате Markdown.
 
-Оглавление
+### Оглавление
 Возможности
 
 Демонстрация
@@ -21,9 +21,10 @@ Research AI Agent
 Контакты
 
 Демонстрация
+
 Скриншоты и демо будут добавлены после реализации полного цикла.
 
-Возможности
+## Возможности
 Планирование исследования — Gemini разбивает запрос на 3–7 шагов.
 
 Исполнение шагов — DeepSeek выбирает нужный инструмент (Wikipedia или DuckDuckGo) и выполняет поиск.
@@ -40,7 +41,28 @@ DuckDuckGo (свежие новости, «человеческий» интер
 
 Минимальная стоимость — бесплатные или дешёвые API (Gemini — бесплатно до 3000 запросов/день, DeepSeek — дёшев).
 
-Установка
+
+## Директория
+
+'''text
+research_agent/
+├── main.py                 # точка входа, CLI
+├── config.py               # загрузка .env, константы
+├── models.py               # Pydantic модели (Plan, Step, Memory, Report)
+├── llm_client.py           # асинхронный клиент DeepSeek с retry/таймаутами
+├── tools/
+│   ├── wiki_tool.py        # search_wiki(query) -> (text, urls, success, error)
+│   └── web_tool.py         # search_web(query) -> (text, urls, success, error)
+├── memory.py               # класс Memory: список шагов, дедупликация
+├── planner.py              # Planner (начальный план) + Replanner
+├── executor.py             # выбор инструмента по ключевым словам
+├── synthesizer.py          # Synthesizer + пост-валидация галлюцинаций
+├── orchestrator.py         # главный цикл Plan-Execute-Replan
+├── logger.py               # настройка loguru (файл+консоль)
+└── reports/                # папка для отчётов (создаётся автоматически)
+'''
+
+## Установка
 bash
 # Клонирование репозитория
 git clone https://github.com/ваш_проект/research-ai-agent.git
@@ -51,9 +73,11 @@ pip install -r requirements.txt
 Создайте файл .env в корне проекта:
 
 env
+
 GEMINI_API_KEY=ваш_ключ_из_Google_AI_Studio
 DEEPSEEK_API_KEY=ваш_ключ_из_platform.deepseek.com
-Использование
+
+## Использование
 После реализации полного цикла агент будет запускаться из командной строки:
 
 bash
@@ -68,6 +92,7 @@ python main.py "квантовые компьютеры"
 Пример ожидаемого отчёта:
 
 markdown
+
 # Отчёт по теме: квантовые компьютеры
 
 ## Основные факты
