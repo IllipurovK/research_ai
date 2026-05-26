@@ -22,7 +22,25 @@ async def execute_step(step_dict: Dict[str, Any], step_id: int, memory: Memory) 
     """Выполняет один шаг: выбирает инструмент, вызывает его, возвращает Step."""
     description = step_dict["description"]
     expected_keywords = step_dict.get("expected_keywords", [])
-    query = description[:200]  # ограничение длины
+    # query = description[:200]  # ограничение длины
+    # normalized_query = memory.normalize_query(query)
+    # Формируем короткий поисковый запрос (2–4 слова)
+    if expected_keywords:
+        # Берём первые 3–4 ключевых слова из подсказки Planner
+        query = ' '.join(expected_keywords[:4])
+    else:
+        # Fallback: берём первые 4 значащих слова из описания (можно добавить стоп-слова)
+        words = description.split()
+        # Простейший фильтр стоп-слов (опционально)
+        stop_words = {"найти", "искать", "определение", "список", "история", "термин", "факты", "описание", "в", "на", "по", "для", "с", "к", "у", "о", "об", "и", "а", "но", "или", "который"}
+        important = [w for w in words if w.lower() not in stop_words]
+        query = ' '.join(important[:4]) if important else ' '.join(words[:4])
+
+    # Финальная обрезка по длине (на случай, если слова очень длинные)
+    query = query[:200].strip()
+    if not query:
+        query = description[:50]  # совсем страховка
+
     normalized_query = memory.normalize_query(query)
 
     # Дедупликация

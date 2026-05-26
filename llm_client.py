@@ -47,7 +47,8 @@ async def call_llm(
             )
             response = await asyncio.wait_for(
                 client.chat.completions.create(
-                    model="deepseek-chat",
+                    # model="deepseek-chat",
+                    model="qwen-plus",
                     messages=messages,
                     temperature=temperature,
                 ),

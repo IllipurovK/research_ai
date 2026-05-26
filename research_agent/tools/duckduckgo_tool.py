@@ -1,6 +1,6 @@
 import asyncio
 from typing import List, Optional, Tuple
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from config import WEB_TIMEOUT, MAX_RESULT_TEXT_LENGTH
 
