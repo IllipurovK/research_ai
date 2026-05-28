@@ -22,24 +22,45 @@ async def execute_step(step_dict: Dict[str, Any], step_id: int, memory: Memory) 
     """Выполняет один шаг: выбирает инструмент, вызывает его, возвращает Step."""
     description = step_dict["description"]
     expected_keywords = step_dict.get("expected_keywords", [])
-    # query = description[:200]  # ограничение длины
-    # normalized_query = memory.normalize_query(query)
-    # Формируем короткий поисковый запрос (2–4 слова)
-    if expected_keywords:
-        # Берём первые 3–4 ключевых слова из подсказки Planner
-        query = ' '.join(expected_keywords[:4])
-    else:
-        # Fallback: берём первые 4 значащих слова из описания (можно добавить стоп-слова)
-        words = description.split()
-        # Простейший фильтр стоп-слов (опционально)
-        stop_words = {"найти", "искать", "определение", "список", "история", "термин", "факты", "описание", "в", "на", "по", "для", "с", "к", "у", "о", "об", "и", "а", "но", "или", "который"}
-        important = [w for w in words if w.lower() not in stop_words]
-        query = ' '.join(important[:4]) if important else ' '.join(words[:4])
+    tool = select_tool_by_keywords(description, expected_keywords)
+    def to_wiki_title(desc: str, keywords: List[str]) -> str:
+        # Стоп-слова для очистки (можно вынести в конфиг)
+        stop_words = {"найти","искать","определение","список","история","термин","факты","описание","в","на","по","для","с","к","у","о","об","и","а","но","или","который","новости","обзор","пример"}
+        if keywords:
+            # Берём первые 2 ключевых слова как основу названия
+            title = ' '.join(keywords[:2]).capitalize()
+            # Если получилось слишком коротко (меньше 2 букв) - берём из описания
+            if len(title) < 3:
+                words = desc.split()
+                important = [w for w in words if w.lower() not in stop_words]
+                title = ' '.join(important[:2]).capitalize()
+        else:
+            words = desc.split()
+            important = [w for w in words if w.lower() not in stop_words]
+            title = ' '.join(important[:2]).capitalize()
+        return title.strip()
 
-    # Финальная обрезка по длине (на случай, если слова очень длинные)
-    query = query[:200].strip()
-    if not query:
-        query = description[:50]  # совсем страховка
+    # Формируем query в зависимости от инструмента
+    if tool == "wiki":
+        # Для Wikipedia используем специальную функцию
+        query = to_wiki_title(description, expected_keywords)
+        # Ещё раз обрезаем до 200 символов на всякий случай
+        query = query[:200].strip()
+        if not query:
+            query = description[:50]
+    else:
+        # Для web оставляем старый алгоритм (ключевые слова или описание)
+        if expected_keywords:
+            query = ' '.join(expected_keywords[:4])
+        else:
+            words = description.split()
+            stop_words = {"найти","искать","определение","список","история","термин","факты","описание","в","на","по","для","с","к","у","о","об","и","а","но","или","который"}
+            important = [w for w in words if w.lower() not in stop_words]
+            query = ' '.join(important[:4]) if important else ' '.join(words[:4])
+        query = query[:200].strip()
+        if not query:
+            query = description[:50]
+    # ------------------------------------------------------------------
 
     normalized_query = memory.normalize_query(query)
 
@@ -63,7 +84,6 @@ async def execute_step(step_dict: Dict[str, Any], step_id: int, memory: Memory) 
         )
 
     # Выбор инструмента
-    tool = select_tool_by_keywords(description, expected_keywords)
     logger.info(f"Шаг {step_id}: '{description}' -> инструмент {tool}, запрос '{query}'")
 
     start = time.time()
@@ -73,12 +93,21 @@ async def execute_step(step_dict: Dict[str, Any], step_id: int, memory: Memory) 
     if tool == "wiki":
         # Для wiki одна попытка (WIKI_RETRIES=1)
         text, urls, success, error = await search_wikipedia(query)
-        retry_count = 0 if success else 1  # если не успешно, считаем что была одна попытка
+        if not success:
+            logger.warning(f"Шаг {step_id}: Wiki не удался ('{query}'), пробуем web fallback")
+            text, urls, success, error = await search_duckduckgo(query)
+            if success:
+                tool = "web (fallback)"
+                retry_count = 0  # duckduckgo сам делает ретраи
+            else:
+                # Если и web не помог – оставляем ошибку, но tool оставляем "wiki"
+                retry_count = 1
+        else:
+            retry_count = 0
     else:  # web
-        # duckduckgo_tool уже содержит retry (3 попытки) и таймаут
         text, urls, success, error = await search_duckduckgo(query)
-        # Мы не можем узнать точное количество ретриев изнутри, ставим 0 (но можно потом доработать)
-        retry_count = 0
+        retry_count = 0  # внутренние ретраи не отслеживаем
+    # ------------------------------------------------------------------
 
     end = time.time()
     step = Step(
@@ -189,3 +218,4 @@ async def research_agent(topic: str, mode: str) -> Tuple[Memory, str]:
 
     logger.info(f"Исследование завершено. Выполнено шагов: {len(memory.steps)}, отчёт длиной {len(report)} символов")
     return memory, report
+
